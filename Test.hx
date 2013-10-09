@@ -13,19 +13,20 @@ import haxe.Timer;
 
 class Settings {
 
-	static inline private var size= 2;
+   // curently most of these have no effect
+   static inline private var size= 2;
 
-	static inline public var fontsize_small= 8*size;
-	static inline public var fontsize_std= 12*size;
-	static inline public var fontsize_big= 22*size;
+   static inline public var fontsize_small= 8*size;
+   static inline public var fontsize_std= 12*size;
+   static inline public var fontsize_big= 22*size;
 
-	static inline public var text_box_bgcolor= 0xdcdcdc;
-	static inline public var button_bgcolor= 0xdcdcdc;
-	static inline public var button_bgcolor_on_hover= 0x50d0ff;
+   static inline public var text_box_bgcolor= 0xdcdcdc;
+   static inline public var button_bgcolor= 0xdcdcdc;
+   static inline public var button_bgcolor_on_hover= 0x50d0ff;
 
-	static inline public var tilesize= 24;
+   static inline public var tilesize= 24;
    static inline public var creep_speedfactor= 2; // (tilesize/creep_speedfactor)%2==0 advisabe
-	static inline public var wavetime= 12;
+   static inline public var wavetime= 12;
 }
 
 // ======== END SETTINGS ======== //
@@ -132,10 +133,10 @@ class Field extends Sprite {
       this.x= (x+0.5)*ts;
       this.y= (y+0.5)*ts;
       tower= null;
-		graphics.lineStyle(1,0x000000);
-		graphics.beginFill(0xffffff);
-		graphics.drawCircle(0,0,3);
-		graphics.endFill();
+      graphics.lineStyle(1,0x000000);
+      graphics.beginFill(0xffffff);
+      graphics.drawCircle(0,0,3);
+      graphics.endFill();
       
       this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       
@@ -163,12 +164,12 @@ class Field extends Sprite {
    public function build(t:TowerType,g:Gold) {
       tower= t;
       g.decrease(tower.cost);
-		graphics.beginFill(0xffffff,0);
-		graphics.drawCircle(0,0,tower.range);
-		graphics.endFill();
-		graphics.beginFill(tower.color);
-		graphics.drawCircle(0,0,8);
-		graphics.endFill();
+      graphics.beginFill(0xffffff,0);
+      graphics.drawCircle(0,0,tower.range);
+      graphics.endFill();
+      graphics.beginFill(tower.color);
+      graphics.drawCircle(0,0,8);
+      graphics.endFill();
    }
 }
 
@@ -234,11 +235,11 @@ class TowerButton extends Sprite {
       towers= t;
       tower_type= type;
       gold= g;
-		
+      
       graphics.lineStyle(3,0xff0000);
-		graphics.beginFill(0x00ffff);
-		graphics.drawCircle(0,0,10);
-		graphics.endFill();
+      graphics.beginFill(0x00ffff);
+      graphics.drawCircle(0,0,10);
+      graphics.endFill();
       
       this.addEventListener(MouseEvent.MOUSE_DOWN,onclick);
       
@@ -250,11 +251,11 @@ class TowerButton extends Sprite {
       var s= clickSprite;
       s.x= e.stageX;
       s.y= e.stageY;
-		s.graphics.beginFill(0x000000,0.2);
-		s.graphics.drawCircle(0,0,tower_type.range);
-		s.graphics.beginFill(0xdd0000);
-		s.graphics.drawCircle(0,0,8);
-		s.graphics.endFill();
+      s.graphics.beginFill(0x000000,0.2);
+      s.graphics.drawCircle(0,0,tower_type.range);
+      s.graphics.beginFill(0xdd0000);
+      s.graphics.drawCircle(0,0,8);
+      s.graphics.endFill();
          
       s.startDrag();
          
@@ -280,13 +281,13 @@ class TowerButton extends Sprite {
          
       // can we build here?
       if(can_build(s.x,s.y)) {
-		   s.graphics.beginFill(0x00dd00);
-	   	s.graphics.drawCircle(0,0,8);
-		   s.graphics.endFill();
+         s.graphics.beginFill(0x00dd00);
+         s.graphics.drawCircle(0,0,8);
+         s.graphics.endFill();
       } else {
-		   s.graphics.beginFill(0xdd0000);
-	   	s.graphics.drawCircle(0,0,8);
-		   s.graphics.endFill();
+         s.graphics.beginFill(0xdd0000);
+         s.graphics.drawCircle(0,0,8);
+         s.graphics.endFill();
       }
    }
    function can_build(x:Float, y:Float) {
@@ -321,10 +322,10 @@ class Creep extends Shape {
       creeps= c;
       gold= c.gold;
 
-		graphics.lineStyle(3,0xff0000);
-		graphics.beginFill(0x0000ff);
-		graphics.drawCircle(0,0,10);
-		graphics.endFill();
+      graphics.lineStyle(3,0xff0000);
+      graphics.beginFill(0x0000ff);
+      graphics.drawCircle(0,0,10);
+      graphics.endFill();
 
       this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       
@@ -466,7 +467,7 @@ class Clock {
 
 class Test {
 
-	static var creeps:Creeps;
+   static var creeps:Creeps;
    static var route:Route;
    static var clock:Clock;
    static var gold:Gold;
