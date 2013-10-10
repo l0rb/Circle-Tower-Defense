@@ -26,6 +26,7 @@ class Settings {
 
    static inline public var tilesize= 24;
    static inline public var creep_speedfactor= 2; // (tilesize/creep_speedfactor)%2==0 advisabe
+   static inline public var bullet_speedfactor= 4;
    static inline public var wavetime= 12;
 }
 
@@ -114,17 +115,94 @@ class TowerType {
    public function new() {
       id= 1;
       range= 50;
-      dmg= 5;
+      dmg= 15;
       rate= 20;
       cost= 10;
       color= 0x0000aa;
    }
+
+}
+
+class Bullet extends Shape {
+   var source:Field;
+   var target:Creep;
+   var frames:Int;
+   var isExploding:Bool;
+
+   public function new(s:Field, t:Creep) {
+      super();
+      target= t;
+      frames= 0;
+      isExploding= false;
+      source= s;
+
+      this.x= source.x;
+      this.y= source.y;
+
+      graphics.lineStyle(1,0x000000);
+      graphics.beginFill(0xffffff);
+      graphics.drawCircle(0,0,2);
+      graphics.endFill();
+
+      this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+
+      flash.Lib.current.addChild(this);
+   }
+
+   function enter_frame(e:flash.events.Event) {
+      if(!isExploding) {
+         move_to_target();
+      }
+   }
+   function move_to_target() {
+      if(target.dead) {
+         // instead give a new target maybe?
+         source.bullets.remove(this);
+         flash.Lib.current.removeChild(this);
+      } else {
+         var bsf= Settings.bullet_speedfactor;
+         if(x>target.x) x-=bsf;
+         else if(x<target.x) x+=bsf;
+         if(y>target.y) y-=bsf;
+         else if(y<target.y) y+=bsf;
+         if(is_at_target()) {
+            explode();
+         }
+      }
+   }
+
+   function explode() {
+      isExploding = true;
+      // move the center a bit to the side so explosion is visible
+      this.x+=5;
+      this.y+=5;
+      graphics.lineStyle(1,0xff0000);
+      graphics.drawCircle(0,0,4);
+      graphics.lineStyle(1,0x00ff00);
+      graphics.drawCircle(0,0,6);
+      graphics.lineStyle(1,0x0000ff);
+      graphics.drawCircle(0,0,8);
+      target.fire(source.tower.dmg);
+      haxe.Timer.delay(endExplosion,110);
+   }
+
+   function endExplosion() {
+      source.bullets.remove(this);
+      flash.Lib.current.removeChild(this);
+   }
+
+   function is_at_target() {
+      var bsf= Settings.bullet_speedfactor;
+      if(Math.abs(x-target.x)<bsf && Math.abs(y-target.y)<bsf) { return true; }
+      else { return false; }
+   }
 }
 
 class Field extends Sprite {
-   public var tower:TowerType;
    var frames:Int;
    var creeps:Creeps;
+   public var tower:TowerType;
+   public var bullets:List<Bullet>;
 
    public function new(x:Float, y:Float, c:Creeps) {
       super();
@@ -137,6 +215,7 @@ class Field extends Sprite {
       graphics.beginFill(0xffffff);
       graphics.drawCircle(0,0,3);
       graphics.endFill();
+      bullets = new List<Bullet>();
       
       this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       
@@ -147,8 +226,8 @@ class Field extends Sprite {
       // search for a creep in range
       var target= creeps.closest(x,y);
       if(target.distance<=tower.range) {
-         target.creep.fire(tower.dmg);
-      } 
+         bullets.add(new Bullet(this, target.creep));
+      }
    }
 
    function enter_frame(e:Event) {
@@ -267,8 +346,8 @@ class TowerButton extends Sprite {
    function build(e:MouseEvent) {
       var s= clickSprite;
       if(can_build(s.x,s.y)) {
-         flash.Lib.current.removeChild(s);
          towers.build(towers.get_field(s.x,s.y),tower_type,gold);
+         flash.Lib.current.removeChild(s);
       }
    }
    function mouse_move(e:MouseEvent) {
@@ -303,16 +382,17 @@ class TowerButton extends Sprite {
 
 class Creep extends Shape {
    var hp:Int;
-   var speed:Float;
+   var speed:Int;
    var goal:RoutePoint;
    var route:Route;
    var frames:Int;
    var creeps:Creeps;
    var gold:Gold;
+   public var dead:Bool;
 
    public function new(r:Route,c:Creeps) {
       super();
-      hp= 100;
+      hp= 20;
       speed= 1;
       frames= 0;
       y= 0; // top of screen
@@ -321,6 +401,7 @@ class Creep extends Shape {
       route= r;
       creeps= c;
       gold= c.gold;
+      dead= false;
 
       graphics.lineStyle(3,0xff0000);
       graphics.beginFill(0x0000ff);
@@ -334,16 +415,21 @@ class Creep extends Shape {
 
    function i_am_dead() {
       creeps.remove(this);
-      flash.Lib.current.removeChild(this);
       creeps.update();
       gold.increase(1);
+      flash.Lib.current.removeChild(this);
+      this.dead= true;
    }
 
    public function fire(dmg:Int) {
-      i_am_dead();
+      hp -= dmg;
+      if (hp <= 0) {
+         i_am_dead();
+      }
    }
 
    function enter_frame(e:flash.events.Event) {
+
       frames+= 1;
       if(frames==speed) {
          move_to_goal();
@@ -416,7 +502,11 @@ class Creeps extends List<Creep> {
       var tmp=wavesize*waveival;
       var i=0;
       while(i<tmp) {
+#if haxe_3
+         haxe.Timer.delay(spawn.bind(r),i);
+#else
          haxe.Timer.delay(callback(spawn,r),i);
+#end
          i+=waveival;
       }
    }
