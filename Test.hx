@@ -13,12 +13,13 @@ import haxe.Timer;
 
 class Settings {
 
-   // curently most of these have no effect
-   static inline private var size= 2;
+   static inline private var size= 1;
 
    static inline public var fontsize_small= 8*size;
    static inline public var fontsize_std= 12*size;
    static inline public var fontsize_big= 22*size;
+
+   static inline public var font= "DejaVu Sans Mono";
 
    static inline public var text_box_bgcolor= 0xdcdcdc;
    static inline public var button_bgcolor= 0xdcdcdc;
@@ -112,15 +113,22 @@ class TowerType {
    public var color:Int;
    public var rate:Int; // time between shots in frames
 
-   public function new() {
-      id= 1;
-      range= 50;
-      dmg= 15;
-      rate= 20;
-      cost= 10;
-      color= 0x0000aa;
+   public function new(id=1) {
+      this.id= id;
+      if(id==1) {
+         range= 50;
+         dmg= 15;
+         rate= 20;
+         cost= 10;
+         color= 0x0000aa;
+      } else if(id==2) {
+         range= 80;
+         dmg= 10;
+         rate= 22;
+         cost= 12;
+         color= 0x123456;
+      }
    }
-
 }
 
 class Bullet extends Shape {
@@ -157,7 +165,6 @@ class Bullet extends Shape {
    function move_to_target() {
       if(target.dead) {
          // instead give a new target maybe?
-         source.bullets.remove(this);
          flash.Lib.current.removeChild(this);
       } else {
          var bsf= Settings.bullet_speedfactor;
@@ -187,7 +194,6 @@ class Bullet extends Shape {
    }
 
    function endExplosion() {
-      source.bullets.remove(this);
       flash.Lib.current.removeChild(this);
    }
 
@@ -202,7 +208,6 @@ class Field extends Sprite {
    var frames:Int;
    var creeps:Creeps;
    public var tower:TowerType;
-   public var bullets:List<Bullet>;
 
    public function new(x:Float, y:Float, c:Creeps) {
       super();
@@ -215,7 +220,6 @@ class Field extends Sprite {
       graphics.beginFill(0xffffff);
       graphics.drawCircle(0,0,3);
       graphics.endFill();
-      bullets = new List<Bullet>();
       
       this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       
@@ -226,7 +230,7 @@ class Field extends Sprite {
       // search for a creep in range
       var target= creeps.closest(x,y);
       if(target.distance<=tower.range) {
-         bullets.add(new Bullet(this, target.creep));
+         new Bullet(this, target.creep);
       }
    }
 
@@ -306,11 +310,12 @@ class TowerButton extends Sprite {
    var range:Int;
    var tower_type:TowerType;
    var gold:Gold;
+   var info:TowerInfo;
 
-   public function new(t:TowerGrid,type:TowerType,g:Gold) {
+   public function new(t:TowerGrid,type:TowerType,g:Gold,x:Float=0,y:Float=0) {
       super();
-      y= Settings.tilesize*2.5;
-      x= Settings.tilesize*11.5;
+      this.y= Settings.tilesize*(2.5+y);
+      this.x= Settings.tilesize*(11.5+x);
       towers= t;
       tower_type= type;
       gold= g;
@@ -321,10 +326,19 @@ class TowerButton extends Sprite {
       graphics.endFill();
       
       this.addEventListener(MouseEvent.MOUSE_DOWN,onclick);
+      this.addEventListener(MouseEvent.MOUSE_OVER,mouse_over);
+      this.addEventListener(MouseEvent.MOUSE_OUT,mouse_out);
       
       flash.Lib.current.addChild(this);
    }
-         
+        
+   function mouse_over(e:MouseEvent) {
+      info= new TowerInfo(tower_type);
+   }
+   function mouse_out(e:MouseEvent) {
+      info.delete();
+   }
+ 
    function onclick(e:MouseEvent) {
       clickSprite= new Sprite();
       var s= clickSprite;
@@ -382,6 +396,7 @@ class TowerButton extends Sprite {
 
 class Creep extends Shape {
    var hp:Int;
+   var maxhp:Int;
    var speed:Int;
    var goal:RoutePoint;
    var route:Route;
@@ -392,25 +407,41 @@ class Creep extends Shape {
 
    public function new(r:Route,c:Creeps) {
       super();
-      hp= 20;
+      maxhp= 50;
+      hp= maxhp;
       speed= 1;
       frames= 0;
-      y= 0; // top of screen
-      x= 5.5*Settings.tilesize;
-      goal= new RoutePoint(x,2.5*Settings.tilesize);
       route= r;
       creeps= c;
       gold= c.gold;
       dead= false;
+      y= 0; // top of screen
+      x= 5.5*Settings.tilesize;
+      goal= new RoutePoint(x,2.5*Settings.tilesize);
 
       graphics.lineStyle(3,0xff0000);
       graphics.beginFill(0x0000ff);
       graphics.drawCircle(0,0,10);
       graphics.endFill();
+   
+      draw_healthbar();   
 
       this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       
       flash.Lib.current.addChild(this);
+   }
+
+   function draw_healthbar() {
+      var ts= Settings.tilesize;
+      var percent= hp/maxhp;
+
+      graphics.lineStyle(1,0x000000);
+      graphics.beginFill(0xffffff);
+      graphics.drawRect(-ts/3,-ts/12,2*ts/3,ts/6);
+      graphics.lineStyle();
+      graphics.beginFill(0x00ff00);
+      graphics.drawRect(-ts/3,-ts/12+1,(2*ts/3)*percent,ts/6-2);
+      graphics.endFill();
    }
 
    function i_am_dead() {
@@ -425,6 +456,8 @@ class Creep extends Shape {
       hp -= dmg;
       if (hp <= 0) {
          i_am_dead();
+      } else {
+         draw_healthbar();
       }
    }
 
@@ -502,7 +535,7 @@ class Creeps extends List<Creep> {
       var tmp=wavesize*waveival;
       var i=0;
       while(i<tmp) {
-#if haxe_3
+#if haxe3
          haxe.Timer.delay(spawn.bind(r),i);
 #else
          haxe.Timer.delay(callback(spawn,r),i);
@@ -517,16 +550,55 @@ class Creeps extends List<Creep> {
 }
 
 class Txt extends flash.text.TextField {
-   public function new(x:Float=0,y:Float=0,text:String="") {
+   public function new(x:Float=0,y:Float=0,text:String="",size:Int=Settings.fontsize_std) {
       super();
-      this.text= text;
       this.x= x;
       this.y= y;
+      
+      var format= new flash.text.TextFormat();
+      format.size= size;
+      format.font= Settings.font;
+      defaultTextFormat= format;
 
+      this.text= text;
       flash.Lib.current.addChild(this);
    }
    public function update(t:String) {
       text= t;
+   }
+   public function delete() {
+      flash.Lib.current.removeChild(this);
+   }
+}
+
+class TowerInfo {
+   var type:TowerType;
+   var cost:Txt;
+   var dmg:Txt;
+   var rate:Txt;
+   var range:Txt;
+   var desc:Txt;
+
+   public function new(t:TowerType) {
+      type= t;
+      var ts= Settings.tilesize;
+      var x= ts*11;
+      var y_base= ts*5;
+      var s= Settings.fontsize_small;
+      cost= new Txt(x,y_base,"Cost: "+Std.string(type.cost),s);
+      var y_increment= cost.textHeight;
+      dmg= new Txt(x,y_base+y_increment,"Damage: "+Std.string(type.dmg),s);
+      rate= new Txt(x,y_base+y_increment*2,"Rate: "+Std.string(type.rate),s);
+      range= new Txt(x,y_base+y_increment*3,"Range: "+Std.string(type.range),s);
+      desc= new Txt(x,y_base+y_increment*4,"This tower shoots.",s);
+   }
+
+   public function delete() {
+      cost.delete();
+      dmg.delete();
+      rate.delete();
+      range.delete();
+      desc.delete();
    }
 }
 
@@ -592,7 +664,8 @@ class Test {
       clock= new Clock(1000,time,creeps);
       
       towers= new TowerGrid(creeps);
-      var b1= new TowerButton(towers, new TowerType(),gold);
+      var b1= new TowerButton(towers, new TowerType(1),gold);
+      var b2= new TowerButton(towers, new TowerType(2),gold,1);
    
    }
 
