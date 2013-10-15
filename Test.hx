@@ -25,14 +25,16 @@ class Settings {
 
    static inline public var font= "DejaVu Sans Mono";
 
-   static inline public var text_box_bgcolor= 0xdcdcdc;
-   static inline public var button_bgcolor= 0xdcdcdc;
-   static inline public var button_bgcolor_on_hover= 0x50d0ff;
-
    static inline public var tilesize= 24;
    static inline public var creep_speedfactor= 2; // (tilesize/creep_speedfactor)%2==0 advisabe
    static inline public var bullet_speedfactor= 4;
    static inline public var wavetime= 12;
+}
+class Colors {
+   static inline public var black= 0x000000;
+   static inline public var white= 0xffffff;
+   static inline public var valid= 0x00ff00; // green, for allowed actions (e.g "can build here")
+   static inline public var invalid= 0xff0000; // red, to mark stuff that doesn't work (e.g. "not enough gold")
 }
 
 // ======== END SETTINGS ======== //
@@ -167,7 +169,7 @@ class Bullet extends Shape {
       graphics.drawCircle(0,0,6);
       graphics.lineStyle(1,0x0000ff);
       graphics.drawCircle(0,0,8);
-      target.fire(source.tower.dmg());
+      target.fire(source.tower.dmg(source.level));
       haxe.Timer.delay(endExplosion,110);
    }
 
@@ -185,14 +187,16 @@ class Bullet extends Shape {
 class Field extends Sprite {
    var frames:Int;
    var creeps:Creeps;
-   public var tower:TowerType;
-   var level:Int;
    var info:FieldInfo;
-   var range:Shape;
+   var range_cone:Shape;
+   public var level:Int;
+   public var tower:TowerType;
+   public var gold:Gold;
 
    public function new(x:Float, y:Float, c:Creeps) {
-      super();
+      super(); 
       creeps= c;
+      gold= c.gold;
       var ts= Settings.tilesize;
       this.x= (x+0.5)*ts;
       this.y= (y+0.5)*ts;
@@ -206,25 +210,47 @@ class Field extends Sprite {
       this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       this.addEventListener(MouseEvent.MOUSE_OVER,mouse_over);
       this.addEventListener(MouseEvent.MOUSE_OUT,mouse_out);
-      
+      this.addEventListener(MouseEvent.MOUSE_DOWN,upgrade);
+       
       flash.Lib.current.addChild(this);
+   }
+      
+   public function cost() {
+      return tower.cost(level);
+   }
+   public function dmg() {
+      return tower.dmg(level);
+   }
+   public function range() {
+      return tower.range(level);
+   }
+   public function rate() {
+      return tower.rate(level);
+   }
+   function upgrade(e:MouseEvent) {
+      if(gold.at_least(cost())) {
+         gold.decrease(cost());
+         level+= 1;
+         info.delete();
+         info= new FieldInfo(this);
+      }
    }
 
    function show_range(show:Bool) {
       if(show) {
-         range= new Shape();
-         range.graphics.beginFill(0x000000,0.15);
-         range.graphics.drawCircle(this.x,this.y,tower.range(level));
-         range.graphics.endFill();
-         flash.Lib.current.addChild(range);
+         range_cone= new Shape();
+         range_cone.graphics.beginFill(0x000000,0.15);
+         range_cone.graphics.drawCircle(this.x,this.y,range());
+         range_cone.graphics.endFill();
+         flash.Lib.current.addChild(range_cone);
       } else {
-         flash.Lib.current.removeChild(range);
+         flash.Lib.current.removeChild(range_cone);
       }
    }
 
    function mouse_over(e:MouseEvent) {
       show_range(true);
-      info= new FieldInfo(tower); 
+      info= new FieldInfo(this);
    }
 
    function mouse_out(e:MouseEvent) {
@@ -267,14 +293,14 @@ class TowerGrid extends List<Field> {
    var creeps:Creeps;
 
    public function new(c:Creeps) {
-      super();
+      super(); 
       width= 9;
       height= 5;
       offsetX= 1;
       offsetY= 3;
       creeps= c;
       for(x in 0...width) {
-         for(y in 0...height) {
+         for(y  in 0...height) {
             add(new Field(x+offsetX,y+offsetY,creeps));
          }
       }
@@ -349,7 +375,7 @@ class TowerButton extends Sprite {
       s.y= e.stageY;
       s.graphics.beginFill(0x000000,0.2);
       s.graphics.drawCircle(0,0,tower_type.range());
-      s.graphics.beginFill(0xdd0000);
+      s.graphics.beginFill(Colors.invalid);
       s.graphics.drawCircle(0,0,8);
       s.graphics.endFill();
          
@@ -365,6 +391,8 @@ class TowerButton extends Sprite {
       if(can_build(s.x,s.y)) {
          towers.build(towers.get_field(s.x,s.y),tower_type,gold);
          flash.Lib.current.removeChild(s);
+      } else {
+         flash.Lib.current.removeChild(s);
       }
    }
    function mouse_move(e:MouseEvent) {
@@ -377,11 +405,11 @@ class TowerButton extends Sprite {
          
       // can we build here?
       if(can_build(s.x,s.y)) {
-         s.graphics.beginFill(0x00dd00);
+         s.graphics.beginFill(Colors.valid);
          s.graphics.drawCircle(0,0,8);
          s.graphics.endFill();
       } else {
-         s.graphics.beginFill(0xdd0000);
+         s.graphics.beginFill(Colors.invalid);
          s.graphics.drawCircle(0,0,8);
          s.graphics.endFill();
       }
@@ -553,13 +581,13 @@ class Creeps extends List<Creep> {
 }
 
 class Txt {
-   var lines:Array<flash.text.TextField>;
+   public var lines:Array<flash.text.TextField>;
    var format:flash.text.TextFormat;
    var x:Float;
    var y:Float;
    var line_height:Float;
 
-   public function new(x:Float=0,y:Float=0,text:String="",size:Int=Settings.fontsize_std) {
+   public function new(x:Float=0,y:Float=0,text:String="",size:Int=Settings.fontsize_std,color=Colors.black) {
       this.x= x;
       this.y= y;
       lines= new Array<flash.text.TextField>();      
@@ -573,6 +601,7 @@ class Txt {
       var tmp= new flash.text.TextField();
       lines[0]= tmp;
       lines[0].defaultTextFormat= format;
+      lines[0].textColor= color;
       lines[0].text= text;
       lines[0].x= x;
       lines[0].y= y;
@@ -622,27 +651,44 @@ class TowerInfo {
 }
 
 class FieldInfo {
-   var type:TowerType;
    var infobox:Txt;
-   var dmg:Txt;
-   var rate:Txt;
-   var range:Txt;
-   var desc:Txt;
+   var field:Field;
+   var gold:Gold;
 
-   public function new(t:TowerType) {
-      type= t;
+   public function new(f:Field) {
+      field= f;
+      gold= f.gold;
       var ts= Settings.tilesize;
       var x= ts*0.5;
       var y_base= ts*9;
       var s= Settings.fontsize_small;
-      infobox= new Txt(x,y_base,"Upgrade: "+Std.string(type.cost())+" Gold",s);
-      infobox.addline("Damage: "+Std.string(type.dmg()));
-      infobox.addline("Rate: "+Std.string(type.rate()));
-      infobox.addline("Range: "+Std.string(type.range()));
+      var colo:Int;
+      if(gold.at_least(field.cost())) {
+         colo= Colors.valid;
+      } else {
+         colo= Colors.invalid;
+      }
+      infobox= new Txt(x,y_base,"Upgrade: "+Std.string(field.cost())+" Gold",s,colo);
+      infobox.addline("Damage: "+Std.string(field.dmg()));
+      infobox.addline("Rate: "+Std.string(field.rate()));
+      infobox.addline("Range: "+Std.string(field.range()));
       infobox.addline("This tower shoots.");
+      
+      field.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+   }
+
+   function enter_frame(e:Event) {
+      var colo:Int;
+      if(gold.at_least(field.cost())) {
+         colo= Colors.valid;
+      } else {
+         colo= Colors.invalid;
+      }
+      infobox.lines[0].textColor= colo;
    }
 
    public function delete() {
+      field.removeEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       infobox.delete();
    }
 }
