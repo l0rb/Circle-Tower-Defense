@@ -6,8 +6,12 @@ import flash.display.Sprite;
 import flash.events.MouseEvent;
 import flash.events.Event;
 
+import flash.text.TextFormat;
+
 import Math;
 import haxe.Timer;
+
+import Towers;
 
 // ========== SETTINGS ========== //
 
@@ -105,32 +109,6 @@ class Route {
    }
 }
 
-class TowerType {
-   public var id:Int;
-   public var range:Int;
-   public var dmg:Int;
-   public var cost:Int;
-   public var color:Int;
-   public var rate:Int; // time between shots in frames
-
-   public function new(id=1) {
-      this.id= id;
-      if(id==1) {
-         range= 50;
-         dmg= 15;
-         rate= 20;
-         cost= 10;
-         color= 0x0000aa;
-      } else if(id==2) {
-         range= 80;
-         dmg= 10;
-         rate= 22;
-         cost= 12;
-         color= 0x123456;
-      }
-   }
-}
-
 class Bullet extends Shape {
    var source:Field;
    var target:Creep;
@@ -189,7 +167,7 @@ class Bullet extends Shape {
       graphics.drawCircle(0,0,6);
       graphics.lineStyle(1,0x0000ff);
       graphics.drawCircle(0,0,8);
-      target.fire(source.tower.dmg);
+      target.fire(source.tower.dmg());
       haxe.Timer.delay(endExplosion,110);
    }
 
@@ -208,6 +186,9 @@ class Field extends Sprite {
    var frames:Int;
    var creeps:Creeps;
    public var tower:TowerType;
+   var level:Int;
+   var info:FieldInfo;
+   var range:Shape;
 
    public function new(x:Float, y:Float, c:Creeps) {
       super();
@@ -216,20 +197,45 @@ class Field extends Sprite {
       this.x= (x+0.5)*ts;
       this.y= (y+0.5)*ts;
       tower= null;
+      level= 0;
       graphics.lineStyle(1,0x000000);
       graphics.beginFill(0xffffff);
       graphics.drawCircle(0,0,3);
       graphics.endFill();
       
       this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+      this.addEventListener(MouseEvent.MOUSE_OVER,mouse_over);
+      this.addEventListener(MouseEvent.MOUSE_OUT,mouse_out);
       
       flash.Lib.current.addChild(this);
+   }
+
+   function show_range(show:Bool) {
+      if(show) {
+         range= new Shape();
+         range.graphics.beginFill(0x000000,0.15);
+         range.graphics.drawCircle(this.x,this.y,tower.range(level));
+         range.graphics.endFill();
+         flash.Lib.current.addChild(range);
+      } else {
+         flash.Lib.current.removeChild(range);
+      }
+   }
+
+   function mouse_over(e:MouseEvent) {
+      show_range(true);
+      info= new FieldInfo(tower); 
+   }
+
+   function mouse_out(e:MouseEvent) {
+      show_range(false);
+      info.delete();
    }
 
    function fire() {
       // search for a creep in range
       var target= creeps.closest(x,y);
-      if(target.distance<=tower.range) {
+      if(target.distance<=tower.range(level)) {
          new Bullet(this, target.creep);
       }
    }
@@ -237,7 +243,7 @@ class Field extends Sprite {
    function enter_frame(e:Event) {
       if(tower!=null) {
          frames+= 1;
-         if(frames>=tower.rate) {
+         if(frames>=tower.rate(level)) {
             fire();
             frames= 0;
          }
@@ -246,10 +252,7 @@ class Field extends Sprite {
 
    public function build(t:TowerType,g:Gold) {
       tower= t;
-      g.decrease(tower.cost);
-      graphics.beginFill(0xffffff,0);
-      graphics.drawCircle(0,0,tower.range);
-      graphics.endFill();
+      g.decrease(tower.cost());
       graphics.beginFill(tower.color);
       graphics.drawCircle(0,0,8);
       graphics.endFill();
@@ -345,7 +348,7 @@ class TowerButton extends Sprite {
       s.x= e.stageX;
       s.y= e.stageY;
       s.graphics.beginFill(0x000000,0.2);
-      s.graphics.drawCircle(0,0,tower_type.range);
+      s.graphics.drawCircle(0,0,tower_type.range());
       s.graphics.beginFill(0xdd0000);
       s.graphics.drawCircle(0,0,8);
       s.graphics.endFill();
@@ -384,7 +387,7 @@ class TowerButton extends Sprite {
       }
    }
    function can_build(x:Float, y:Float) {
-      if(!gold.at_least(tower_type.cost)) { return false; }
+      if(!gold.at_least(tower_type.cost())) { return false; }
       if(!towers.in_grid(x,y)) { return false; }
       else {
          var f= towers.get_field(x,y);
@@ -549,31 +552,78 @@ class Creeps extends List<Creep> {
    }
 }
 
-class Txt extends flash.text.TextField {
+class Txt {
+   var lines:Array<flash.text.TextField>;
+   var format:flash.text.TextFormat;
+   var x:Float;
+   var y:Float;
+   var line_height:Float;
+
    public function new(x:Float=0,y:Float=0,text:String="",size:Int=Settings.fontsize_std) {
-      super();
       this.x= x;
       this.y= y;
-      
-      var format= new flash.text.TextFormat();
+      lines= new Array<flash.text.TextField>();      
+
+      format= new flash.text.TextFormat();
       format.size= size;
       format.font= Settings.font;
-      defaultTextFormat= format;
 
-      this.text= text;
-      flash.Lib.current.addChild(this);
+      //addline(text);
+   
+      var tmp= new flash.text.TextField();
+      lines[0]= tmp;
+      lines[0].defaultTextFormat= format;
+      lines[0].text= text;
+      lines[0].x= x;
+      lines[0].y= y;
+      line_height= lines[0].textHeight;
+      flash.Lib.current.addChild(lines[0]);
+   
    }
-   public function update(t:String) {
-      text= t;
+   public function addline(t:String) {
+      var index= lines.length;
+      lines[index]= new flash.text.TextField();
+      lines[index].defaultTextFormat= format;
+      lines[index].text= t;
+      lines[index].x= x;
+      lines[index].y= y+line_height*index;
+      flash.Lib.current.addChild(lines[index]);
+   }
+   public function update(t:String,line=0) {
+      lines[line].text= t;
    }
    public function delete() {
-      flash.Lib.current.removeChild(this);
+      for(l in lines.iterator()) {
+         flash.Lib.current.removeChild(l);
+      }
    }
 }
 
 class TowerInfo {
    var type:TowerType;
-   var cost:Txt;
+   var infobox:Txt;
+
+   public function new(t:TowerType) {
+      type= t;
+      var ts= Settings.tilesize;
+      var x= ts*11;
+      var y_base= ts*5;
+      var s= Settings.fontsize_small;
+      infobox= new Txt(x,y_base,"Cost: "+Std.string(type.cost()),s);
+      infobox.addline("Damage: "+Std.string(type.dmg()));
+      infobox.addline("Rate: "+Std.string(type.rate()));
+      infobox.addline("Range: "+Std.string(type.range()));
+      infobox.addline("This tower shoots.");
+   }
+
+   public function delete() {
+      infobox.delete();
+   }
+}
+
+class FieldInfo {
+   var type:TowerType;
+   var infobox:Txt;
    var dmg:Txt;
    var rate:Txt;
    var range:Txt;
@@ -582,23 +632,18 @@ class TowerInfo {
    public function new(t:TowerType) {
       type= t;
       var ts= Settings.tilesize;
-      var x= ts*11;
-      var y_base= ts*5;
+      var x= ts*0.5;
+      var y_base= ts*9;
       var s= Settings.fontsize_small;
-      cost= new Txt(x,y_base,"Cost: "+Std.string(type.cost),s);
-      var y_increment= cost.textHeight;
-      dmg= new Txt(x,y_base+y_increment,"Damage: "+Std.string(type.dmg),s);
-      rate= new Txt(x,y_base+y_increment*2,"Rate: "+Std.string(type.rate),s);
-      range= new Txt(x,y_base+y_increment*3,"Range: "+Std.string(type.range),s);
-      desc= new Txt(x,y_base+y_increment*4,"This tower shoots.",s);
+      infobox= new Txt(x,y_base,"Upgrade: "+Std.string(type.cost())+" Gold",s);
+      infobox.addline("Damage: "+Std.string(type.dmg()));
+      infobox.addline("Rate: "+Std.string(type.rate()));
+      infobox.addline("Range: "+Std.string(type.range()));
+      infobox.addline("This tower shoots.");
    }
 
    public function delete() {
-      cost.delete();
-      dmg.delete();
-      rate.delete();
-      range.delete();
-      desc.delete();
+      infobox.delete();
    }
 }
 
@@ -652,7 +697,7 @@ class Test {
       route.add_point(topright);
       route.add_point(botright);
       route.add_point(botleft);
-      
+  
       gold_t= new Txt(0,ts*1);
       gold= new Gold(40,gold_t);
 
@@ -664,9 +709,8 @@ class Test {
       clock= new Clock(1000,time,creeps);
       
       towers= new TowerGrid(creeps);
-      var b1= new TowerButton(towers, new TowerType(1),gold);
-      var b2= new TowerButton(towers, new TowerType(2),gold,1);
+      var b1= new TowerButton(towers, new BasicTower(),gold);
+      var b2= new TowerButton(towers, new LongRangeTower(),gold,1);
    
-   }
-
+    }
 }
