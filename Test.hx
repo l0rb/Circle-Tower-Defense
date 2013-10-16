@@ -7,7 +7,7 @@ import flash.events.MouseEvent;
 import flash.events.Event;
 
 import flash.text.TextFormat;
-
+import flash.text.TextFieldAutoSize;
 import Math;
 import haxe.Timer;
 
@@ -47,6 +47,9 @@ class Gold {
    }
    public function at_least(g:Int) {
       return (amount>=g);
+   }
+   public function delete() {
+      text.delete();
    }
 }
 
@@ -153,7 +156,11 @@ class Field extends Sprite {
        
       flash.Lib.current.addChild(this);
    }
-      
+     
+   public function delete() {
+      flash.Lib.current.removeChild(this);
+   }
+
    public function cost() {
       return tower.cost(level);
    }
@@ -245,6 +252,13 @@ class TowerGrid extends List<Field> {
       }
    }
    
+   public function delete() {
+      for(f in iterator()) {
+         f.delete();
+         f= null;
+      }
+   }
+
    public function in_grid(x:Float, y:Float) {
       var ts= Settings.tilesize;
       var startx= offsetX*ts;
@@ -300,6 +314,10 @@ class TowerButton extends Sprite {
       flash.Lib.current.addChild(this);
    }
         
+   public function delete() {
+      flash.Lib.current.removeChild(this);
+   }
+
    function mouse_over(e:MouseEvent) {
       info= new TowerInfo(tower_type);
    }
@@ -369,6 +387,7 @@ class Creeps extends List<Creep> {
    var text:Txt;
    var wave_counter:Int;
    public var gold:Gold;
+   var timer:List<Timer>;
 
    public function new(r:Route,t:Txt,g:Gold) {
       super();
@@ -377,10 +396,23 @@ class Creeps extends List<Creep> {
       gold= g;
       wave_counter= 0;
       text.update("Creeps: "+Std.string(length));
+      timer= new List<Timer>();
       
       // can't add eventlistener to a List<T>
       // todo: find something better to attach eventlistener to
       flash.Lib.current.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+   }
+
+   public function delete() {
+      text.delete();
+      flash.Lib.current.removeEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+      for(s in timer.iterator()) {
+         s.stop();
+      }
+      for(f in iterator()) {
+         f.delete();
+         f= null;
+      }
    }
 
    function enter_frame(e:Event) {
@@ -430,9 +462,9 @@ class Creeps extends List<Creep> {
       var i=0;
       while(i<tmp) {
 #if haxe3
-         haxe.Timer.delay(spawn.bind(r),i);
+         timer.add(haxe.Timer.delay(spawn.bind(r),i));
 #else
-         haxe.Timer.delay(callback(spawn,r),i);
+         timer.add(haxe.Timer.delay(callback(spawn,r),i));
 #end
          i+=waveival;
       }
@@ -580,22 +612,68 @@ class Clock {
       }
       text.update("Next Wave: "+Std.string(n));
    }
+      
+   public function delete() {
+      text.delete();
+      timer.stop();
+   }
 }
 
-class Test {
+class Button extends flash.text.TextField {
+         
+   public function new(x:Float, y:Float, t="", size=Settings.fontsize_std) {
+      super();
+      this.x= x;
+      this.y= y;
+      text= t;
+      background= true;
+      backgroundColor= Colors.button;
+      border= true;
+      borderColor= Colors.button_border;
+          
+      var format= new flash.text.TextFormat();
+      format.size= size;
+      format.font= Settings.font;
+      defaultTextFormat= format;
+             
+      //height= textHeight;
+      //width= textWidth;
+      autoSize= TextFieldAutoSize.CENTER;
+         
+      flash.Lib.current.addChild(this);
+         
+      this.addEventListener(MouseEvent.MOUSE_OVER,mouse_over);
+      this.addEventListener(MouseEvent.MOUSE_OUT,mouse_out);
+   }
+      
+   function mouse_over(e:MouseEvent) {
+      backgroundColor= Colors.button_hover;
+   }
+   function mouse_out(e:MouseEvent) {
+      backgroundColor= Colors.button;
+   }
+   function onclick(e:MouseEvent);
 
+   public function delete() {
+      flash.Lib.current.removeChild(this);
+   }
+}
+
+class Game {
    static var creeps:Creeps;
    static var route:Route;
    static var clock:Clock;
    static var gold:Gold;
    static var towers:TowerGrid;
+   static var b1:TowerButton;
+   static var b2:TowerButton;
 
    // textfields
    static var time:Txt;
    static var gold_t:Txt;
    static var creeps_t:Txt;
 
-   static function main() {
+   public function new() {
 
       var ts= Settings.tilesize;
       route= new Route();
@@ -619,8 +697,91 @@ class Test {
       clock= new Clock(1000,time,creeps);
       
       towers= new TowerGrid(creeps);
-      var b1= new TowerButton(towers, new BasicTower(),gold);
-      var b2= new TowerButton(towers, new LongRangeTower(),gold,1);
-   
-    }
+      b1= new TowerButton(towers, new BasicTower(),gold);
+      b2= new TowerButton(towers, new LongRangeTower(),gold,1);
+  
+      // can't add eventlistener to Game-Object
+      // todo: find something better to attach eventlistener to
+      // todo: have the spawn function dispatch a custom event to be listened for here
+      flash.Lib.current.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+   }
+   function enter_frame(e:Event) {
+      is_it_over_yet();
+   }
+   function is_it_over_yet() {
+      if(creeps.length>=Settings.death) {
+         // yes it's over
+         new Menu();
+         delete();
+      }
+   }
+   function delete() {
+      creeps.delete();
+      clock.delete();
+      b1.delete();
+      b2.delete();
+      gold.delete();
+      towers.delete();
+   }
 }
+
+class Credits {
+   var back:Button;
+   var cred:Txt;
+
+   public function new() {
+      cred= new Txt(10,10,"lorb");
+      cred.addline("balrok");
+      cred.addline("wyzau");
+         
+      back= new Button(10,150,"Back to Menu");
+      back.addEventListener(MouseEvent.MOUSE_DOWN,click_back);
+   }
+   function click_back(e:MouseEvent) {
+      delete();
+      new Menu();
+   }
+   function delete() {
+      cred.delete();
+      back.delete();
+   }
+}
+
+class Menu {
+   var start:Button;
+   var credits:Button;
+
+   public function new() {
+      start= new Button(120,40,"Start Game!");
+      start.addEventListener(MouseEvent.MOUSE_DOWN,click_start);
+      
+      credits= new Button(120,70,"Credits");
+      credits.addEventListener(MouseEvent.MOUSE_DOWN,click_credits);
+   }
+
+   function click_start(e:MouseEvent) {
+      delete();
+      new Game();
+   }
+   function click_credits(e:MouseEvent) {
+      delete();
+      new Credits();
+   }
+
+   public function delete() {
+      start.delete();
+      start= null;
+      credits.delete();
+   }
+}
+
+class Test {
+   //static var menu:Menu;
+
+   static function main() {
+      //menu= new Menu();
+      new Menu();
+   }
+
+}
+

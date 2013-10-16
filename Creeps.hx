@@ -73,6 +73,10 @@ class Creep extends Shape {
       flash.Lib.current.addChild(this);
    }
 
+   public function delete() {
+      flash.Lib.current.removeChild(this);
+   }
+
    function draw_healthbar() {
       var ts= Settings.tilesize;
       var percent= hp/maxhp;
