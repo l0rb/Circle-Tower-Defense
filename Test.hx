@@ -12,32 +12,9 @@ import Math;
 import haxe.Timer;
 
 import Towers;
+import Creeps;
 
-// ========== SETTINGS ========== //
-
-class Settings {
-
-   static inline private var size= 1;
-
-   static inline public var fontsize_small= 8*size;
-   static inline public var fontsize_std= 12*size;
-   static inline public var fontsize_big= 22*size;
-
-   static inline public var font= "DejaVu Sans Mono";
-
-   static inline public var tilesize= 24;
-   static inline public var creep_speedfactor= 2; // (tilesize/creep_speedfactor)%2==0 advisabe
-   static inline public var bullet_speedfactor= 4;
-   static inline public var wavetime= 12;
-}
-class Colors {
-   static inline public var black= 0x000000;
-   static inline public var white= 0xffffff;
-   static inline public var valid= 0x00ff00; // green, for allowed actions (e.g "can build here")
-   static inline public var invalid= 0xff0000; // red, to mark stuff that doesn't work (e.g. "not enough gold")
-}
-
-// ======== END SETTINGS ======== //
+import Settings;
 
 class Gold {
    private var amount:Int;
@@ -70,44 +47,6 @@ class Gold {
    }
    public function at_least(g:Int) {
       return (amount>=g);
-   }
-}
-
-class RoutePoint {
-   public var x:Float;
-   public var y:Float;
-   public var n:Int;
-   public function new(x:Float,y:Float,n:Int=0) {
-      this.x= x;
-      this.y= y;
-      this.n= n;
-   }
-}
-
-class Route {
-   var route:Array<RoutePoint>;
-
-   public function new() {
-      route= new Array();
-   }
-
-   public function add_point(p:RoutePoint) {
-      // todo: handle duplicate n (replace old routepoint?)
-      route.push(p);
-      route.sort(sort_me);
-   }
-   private function sort_me(a:RoutePoint,b:RoutePoint) {
-      if(a.n==b.n) { return 0; }
-      else if(a.n>b.n) { return 1; }
-      else { return -1; }
-   }
-   public function next(p:RoutePoint) {
-      if(p.n==route.length) {
-         // this means we are at the end of the route: return to the start
-         return route[0];
-      } else {
-         return route[p.n];
-      }
    }
 }
 
@@ -169,7 +108,7 @@ class Bullet extends Shape {
       graphics.drawCircle(0,0,6);
       graphics.lineStyle(1,0x0000ff);
       graphics.drawCircle(0,0,8);
-      target.fire(source.tower.dmg(source.level));
+      target.fire(source.dmg());
       haxe.Timer.delay(endExplosion,110);
    }
 
@@ -425,105 +364,10 @@ class TowerButton extends Sprite {
    }
 }
 
-class Creep extends Shape {
-   var hp:Int;
-   var maxhp:Int;
-   var speed:Int;
-   var goal:RoutePoint;
-   var route:Route;
-   var frames:Int;
-   var creeps:Creeps;
-   var gold:Gold;
-   public var dead:Bool;
-
-   public function new(r:Route,c:Creeps) {
-      super();
-      maxhp= 50;
-      hp= maxhp;
-      speed= 1;
-      frames= 0;
-      route= r;
-      creeps= c;
-      gold= c.gold;
-      dead= false;
-      y= 0; // top of screen
-      x= 5.5*Settings.tilesize;
-      goal= new RoutePoint(x,2.5*Settings.tilesize);
-
-      graphics.lineStyle(3,0xff0000);
-      graphics.beginFill(0x0000ff);
-      graphics.drawCircle(0,0,10);
-      graphics.endFill();
-   
-      draw_healthbar();   
-
-      this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
-      
-      flash.Lib.current.addChild(this);
-   }
-
-   function draw_healthbar() {
-      var ts= Settings.tilesize;
-      var percent= hp/maxhp;
-
-      graphics.lineStyle(1,0x000000);
-      graphics.beginFill(0xffffff);
-      graphics.drawRect(-ts/3,-ts/12,2*ts/3,ts/6);
-      graphics.lineStyle();
-      graphics.beginFill(0x00ff00);
-      graphics.drawRect(-ts/3,-ts/12+1,(2*ts/3)*percent,ts/6-2);
-      graphics.endFill();
-   }
-
-   function i_am_dead() {
-      creeps.remove(this);
-      creeps.update();
-      gold.increase(1);
-      flash.Lib.current.removeChild(this);
-      this.dead= true;
-   }
-
-   public function fire(dmg:Int) {
-      hp -= dmg;
-      if (hp <= 0) {
-         i_am_dead();
-      } else {
-         draw_healthbar();
-      }
-   }
-
-   function enter_frame(e:flash.events.Event) {
-
-      frames+= 1;
-      if(frames==speed) {
-         move_to_goal();
-         frames= 0;
-      }
-   }
-   function move_to_goal() {
-      var csf= Settings.creep_speedfactor;
-      if(x>goal.x) x-=csf;
-      else if(x<goal.x) x+=csf;
-      if(y>goal.y) y-=csf;
-      else if(y<goal.y) y+=csf;
-      if(is_at_goal()) {
-         goal= route.next(goal);
-      }
-   }
-   public function set_goal(x:Float, y:Float) {
-      goal.x= x;
-      goal.y= y;
-   }
-   public function is_at_goal() {
-      var csf= Settings.creep_speedfactor;
-      if(Math.abs(x-goal.x)<csf && Math.abs(y-goal.y)<csf) { return true; }
-      else { return false; } 
-   }
-}
-
 class Creeps extends List<Creep> {
    var route:Route;
    var text:Txt;
+   var wave_counter:Int;
    public var gold:Gold;
 
    public function new(r:Route,t:Txt,g:Gold) {
@@ -531,7 +375,26 @@ class Creeps extends List<Creep> {
       route= r;
       text= t;
       gold= g;
+      wave_counter= 0;
       text.update("Creeps: "+Std.string(length));
+      
+      // can't add eventlistener to a List<T>
+      // todo: find something better to attach eventlistener to
+      flash.Lib.current.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+   }
+
+   function enter_frame(e:Event) {
+      remove_dead();
+   }
+   function remove_dead() {
+      for(creep in iterator()) {
+         if(creep.dead) {
+            gold.increase(creep.value);
+            remove(creep);
+            update();
+            flash.Lib.current.removeChild(creep);
+         }
+      }
    }
 
    public function update() {
@@ -557,7 +420,7 @@ class Creeps extends List<Creep> {
    }
 
    public function spawn(r:Route) {
-      add(new Creep(r,this));
+      add(new Creep(r,50+10*wave_counter,wave_counter));
       update();
    }
    public function spawn_wave_with_route(r:Route) {
@@ -576,6 +439,7 @@ class Creeps extends List<Creep> {
    }
    
    public function spawn_wave() {
+      wave_counter+= 1;
       spawn_wave_with_route(route);
    }
 }
