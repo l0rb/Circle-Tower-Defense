@@ -711,17 +711,21 @@ class Game {
    function is_it_over_yet() {
       if(creeps.length>=Settings.death) {
          // yes it's over
-         new Menu();
          delete();
+         new Menu();
       }
    }
    function delete() {
-      creeps.delete();
+      var stage= flash.Lib.current;
       clock.delete();
+      creeps.delete();
       b1.delete();
       b2.delete();
       gold.delete();
       towers.delete();
+      while(stage.numChildren > 0) {
+         stage.removeChildAt(0);
+      }
    }
 }
 
@@ -769,9 +773,12 @@ class Menu {
    }
 
    public function delete() {
+      var stage= flash.Lib.current;
       start.delete();
-      start= null;
       credits.delete();
+      while(stage.numChildren > 0) {
+         stage.removeChildAt(0);
+      }
    }
 }
 
