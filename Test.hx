@@ -20,8 +20,8 @@ class Gold {
    private var amount:Int;
    var text:Txt;
       
-   public function new(g:Int,t:Txt) {
-      amount= g;
+   public function new(t:Txt) {
+      amount= Settings.start_gold;
       text= t;
       text.update("Gold: "+Std.string(amount));
    }
@@ -48,8 +48,13 @@ class Gold {
    public function at_least(g:Int) {
       return (amount>=g);
    }
-   public function delete() {
-      text.delete();
+   public function stop() {
+      text.hide();
+   }
+   public function start() {
+      amount= Settings.start_gold;
+      text.update("Gold: "+Std.string(amount));
+      text.show();
    }
 }
 
@@ -160,6 +165,21 @@ class Field extends Sprite {
    public function delete() {
       flash.Lib.current.removeChild(this);
    }
+   public function hide() {
+      flash.Lib.current.removeChild(this);
+   }
+   public function show() {
+      flash.Lib.current.addChild(this);
+   }
+   public function reset() {
+      tower= null;
+      level= 0;
+      graphics.clear();
+      graphics.lineStyle(1,0x000000);
+      graphics.beginFill(0xffffff);
+      graphics.drawCircle(0,0,3);
+      graphics.endFill();
+   }
 
    public function cost() {
       return tower.cost(level);
@@ -252,13 +272,6 @@ class TowerGrid extends List<Field> {
       }
    }
    
-   public function delete() {
-      for(f in iterator()) {
-         f.delete();
-         f= null;
-      }
-   }
-
    public function in_grid(x:Float, y:Float) {
       var ts= Settings.tilesize;
       var startx= offsetX*ts;
@@ -283,6 +296,23 @@ class TowerGrid extends List<Field> {
    }
    public function build(f:Field, type:TowerType, g:Gold) {
       f.build(type,g);
+   }
+   public function delete() {
+      for(f in iterator()) {
+         f.delete();
+         f= null;
+      }
+   }
+   public function stop() {
+      for(f in iterator()) {
+         f.reset();
+         f.hide();
+      }
+   }
+   public function start() {
+      for(f in iterator()) {
+         f.show();
+      }
    }
 }
 
@@ -313,9 +343,15 @@ class TowerButton extends Sprite {
       
       flash.Lib.current.addChild(this);
    }
-        
-   public function delete() {
+   
+   public function hide() {
       flash.Lib.current.removeChild(this);
+   }
+   public function show() {
+      flash.Lib.current.addChild(this);
+   }
+   public function delete() {
+      hide();
    }
 
    function mouse_over(e:MouseEvent) {
@@ -413,6 +449,23 @@ class Creeps extends List<Creep> {
          f.delete();
          f= null;
       }
+   }
+   public function stop() {
+      text.hide();
+      flash.Lib.current.removeEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+      for(s in timer.iterator()) {
+         s.stop();
+      }
+      for(f in iterator()) {
+         f.delete();
+      }
+      clear(); // emtpy list
+   }
+   public function start() {
+      text.show();
+      text.update("Creeps: "+Std.string(length));
+      timer= new List<Timer>();
+      flash.Lib.current.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
    }
 
    function enter_frame(e:Event) {
@@ -518,8 +571,16 @@ class Txt {
       lines[line].text= t;
    }
    public function delete() {
+      hide();
+   }
+   public function hide() {
       for(l in lines.iterator()) {
          flash.Lib.current.removeChild(l);
+      }
+   }
+   public function show() {
+      for(l in lines.iterator()) {
+         flash.Lib.current.addChild(l);
       }
    }
 }
@@ -591,6 +652,7 @@ class FieldInfo {
 
 class Clock {
    var n:Int;
+   var t:Int;
    var text:Txt;
    var timer:Timer;
    var creeps:Creeps;
@@ -599,6 +661,7 @@ class Clock {
       n= Settings.wavetime;
       text= textField;
       text.update("Next Wave: "+Std.string(n));
+      this.t= t;
       timer= new Timer(t);
       timer.run= run;
       creeps= c;
@@ -613,14 +676,20 @@ class Clock {
       text.update("Next Wave: "+Std.string(n));
    }
       
-   public function delete() {
-      text.delete();
+   public function stop() {
+      text.hide();
       timer.stop();
+   }
+   public function start() {
+      n= Settings.wavetime;
+      text.show();
+      text.update("Next Wave: "+Std.string(n));
+      timer= new Timer(t);
+      timer.run= run;
    }
 }
 
 class Button extends flash.text.TextField {
-         
    public function new(x:Float, y:Float, t="", size=Settings.fontsize_std) {
       super();
       this.x= x;
@@ -654,8 +723,11 @@ class Button extends flash.text.TextField {
    }
    function onclick(e:MouseEvent);
 
-   public function delete() {
+   public function hide() {
       flash.Lib.current.removeChild(this);
+   }
+   public function show() {
+      flash.Lib.current.addChild(this);
    }
 }
 
@@ -667,14 +739,14 @@ class Game {
    static var towers:TowerGrid;
    static var b1:TowerButton;
    static var b2:TowerButton;
+   static var menu:Menu;
 
    // textfields
    static var time:Txt;
    static var gold_t:Txt;
    static var creeps_t:Txt;
 
-   public function new() {
-
+   public function new(m:Menu) {
       var ts= Settings.tilesize;
       route= new Route();
       var topleft= new RoutePoint(ts*0.5,ts*2.5,1);
@@ -687,15 +759,16 @@ class Game {
       route.add_point(botleft);
   
       gold_t= new Txt(0,ts*1);
-      gold= new Gold(40,gold_t);
+      gold= new Gold(gold_t);
 
       creeps_t= new Txt(6*ts,0);
       creeps= new Creeps(route,creeps_t,gold);
-      creeps.spawn_wave();
            
       time= new Txt();
       clock= new Clock(1000,time,creeps);
       
+      menu= m;
+
       towers= new TowerGrid(creeps);
       b1= new TowerButton(towers, new BasicTower(),gold);
       b2= new TowerButton(towers, new LongRangeTower(),gold,1);
@@ -704,6 +777,7 @@ class Game {
       // todo: find something better to attach eventlistener to
       // todo: have the spawn function dispatch a custom event to be listened for here
       flash.Lib.current.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+      stop();
    }
    function enter_frame(e:Event) {
       is_it_over_yet();
@@ -711,17 +785,27 @@ class Game {
    function is_it_over_yet() {
       if(creeps.length>=Settings.death) {
          // yes it's over
-         new Menu();
-         delete();
+         //new Menu();
+         stop();
+         menu.start();
       }
    }
-   function delete() {
-      creeps.delete();
-      clock.delete();
-      b1.delete();
-      b2.delete();
-      gold.delete();
-      towers.delete();
+   public function stop() {
+      creeps.stop();
+      clock.stop();
+      b1.hide();
+      b2.hide();
+      gold.stop();
+      towers.stop();
+   }
+   public function start() {
+      creeps.start();
+      creeps.spawn_wave();
+      clock.start();
+      gold.start();
+      b1.show();
+      b2.show();
+      towers.start();
    }
 }
 
@@ -742,36 +826,42 @@ class Credits {
       new Menu();
    }
    function delete() {
-      cred.delete();
-      back.delete();
+      cred.hide();
+      back.hide();
    }
 }
 
 class Menu {
-   var start:Button;
+   var startb:Button;
    var credits:Button;
+   var game:Game;
 
    public function new() {
-      start= new Button(120,40,"Start Game!");
-      start.addEventListener(MouseEvent.MOUSE_DOWN,click_start);
+      startb= new Button(120,40,"Start Game!");
+      startb.addEventListener(MouseEvent.MOUSE_DOWN,click_start);
       
       credits= new Button(120,70,"Credits");
       credits.addEventListener(MouseEvent.MOUSE_DOWN,click_credits);
+
+      game= new Game(this);
    }
 
    function click_start(e:MouseEvent) {
-      delete();
-      new Game();
+      stop();
+      game.start();
    }
    function click_credits(e:MouseEvent) {
-      delete();
-      new Credits();
+      stop();
+      //new Credits();
    }
 
-   public function delete() {
-      start.delete();
-      start= null;
-      credits.delete();
+   public function stop() {
+      startb.hide();
+      credits.hide();
+   }
+   public function start() {
+      startb.show();
+      credits.show();
    }
 }
 
