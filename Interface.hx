@@ -36,6 +36,7 @@ class Txt {
       lines[0].text= text;
       lines[0].x= x;
       lines[0].y= y;
+      lines[0].autoSize= TextFieldAutoSize.LEFT;
       line_height= lines[0].textHeight;
       flash.Lib.current.addChild(lines[0]);
    
@@ -47,6 +48,7 @@ class Txt {
       lines[index].text= t;
       lines[index].x= x;
       lines[index].y= y+line_height*index;
+      lines[index].autoSize= TextFieldAutoSize.LEFT;
       flash.Lib.current.addChild(lines[index]);
    }
    public function update(t:String,line=0) {

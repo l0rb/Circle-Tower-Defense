@@ -15,6 +15,17 @@ import Interface;
 
 import Settings;
 
+class Stats {
+   public var last_score:Int;
+   var total_score:Int;
+         
+   public function new() {
+      // todo: read data from SharedObject
+      last_score= 0;
+      total_score= 0;
+   }
+}
+
 class Gold {
    private var amount:Int;
    var text:Txt;
@@ -419,18 +430,23 @@ class TowerButton extends Sprite {
 
 class Creeps extends List<Creep> {
    var route:Route;
-   var text:Txt;
-   var wave_counter:Int;
-   public var gold:Gold;
+   var creep_text:Txt;
+   var wave_text:Txt;
    var timer:List<Timer>;
+   public var wave_counter:Int;
+   public var killed:Int;
+   public var gold:Gold;
 
-   public function new(r:Route,t:Txt,g:Gold) {
+   public function new(r:Route,ct:Txt,wt:Txt,g:Gold) {
       super();
       route= r;
-      text= t;
+      creep_text= ct;
+      wave_text= wt;
       gold= g;
       wave_counter= 0;
-      text.update("Creeps: "+Std.string(length));
+      killed= 0;
+      creep_text.update("Creeps: "+Std.string(length));
+      wave_text.update("Wave: "+Std.string(wave_counter));
       timer= new List<Timer>();
       
       // can't add eventlistener to a List<T>
@@ -438,8 +454,10 @@ class Creeps extends List<Creep> {
       flash.Lib.current.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
    }
 
+   /*
    public function delete() {
-      text.delete();
+      creep_text.delete();
+      wave_text.delete();
       flash.Lib.current.removeEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       for(s in timer.iterator()) {
          s.stop();
@@ -449,8 +467,12 @@ class Creeps extends List<Creep> {
          f= null;
       }
    }
+   */
    public function stop() {
-      text.hide();
+      wave_counter= 0;
+      killed= 0;
+      creep_text.hide();
+      wave_text.hide();
       flash.Lib.current.removeEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       for(s in timer.iterator()) {
          s.stop();
@@ -461,8 +483,10 @@ class Creeps extends List<Creep> {
       clear(); // emtpy list
    }
    public function start() {
-      text.show();
-      text.update("Creeps: "+Std.string(length));
+      creep_text.show();
+      creep_text.update("Creeps: "+Std.string(length));
+      wave_text.show();
+      wave_text.update("Wave: "+Std.string(wave_counter));
       timer= new List<Timer>();
       flash.Lib.current.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
    }
@@ -473,6 +497,7 @@ class Creeps extends List<Creep> {
    function remove_dead() {
       for(creep in iterator()) {
          if(creep.dead) {
+            killed+= 1;
             gold.increase(creep.value);
             remove(creep);
             update();
@@ -482,7 +507,8 @@ class Creeps extends List<Creep> {
    }
 
    public function update() {
-      text.update("Creeps: "+Std.string(length));
+      creep_text.update("Creeps: "+Std.string(length));
+      wave_text.update("Wave: "+Std.string(wave_counter));
    }
 
    public function closest(x:Float, y:Float) {
@@ -641,13 +667,19 @@ class Game {
    static var b1:TowerButton;
    static var b2:TowerButton;
    static var menu:Menu;
+   static var gameover:GameOver;
+   static var stats:Stats;
 
    // textfields
    static var time:Txt;
    static var gold_t:Txt;
    static var creeps_t:Txt;
+   static var wave_t:Txt;
 
    public function new(m:Menu) {
+      menu= m;
+      stats= menu.stats;
+
       var ts= Settings.tilesize;
       route= new Route();
       var topleft= new RoutePoint(ts*0.5,ts*2.5,1);
@@ -663,17 +695,18 @@ class Game {
       gold= new Gold(gold_t);
 
       creeps_t= new Txt(6*ts,0);
-      creeps= new Creeps(route,creeps_t,gold);
+      wave_t= new Txt(6*ts,1*ts);
+      creeps= new Creeps(route,creeps_t,wave_t,gold);
            
       time= new Txt();
       clock= new Clock(1000,time,creeps);
       
-      menu= m;
-
       towers= new TowerGrid(creeps);
       b1= new TowerButton(towers, new BasicTower(),gold);
       b2= new TowerButton(towers, new LongRangeTower(),gold,1);
   
+      gameover= new GameOver(m);
+
       // can't add eventlistener to Game-Object
       // todo: find something better to attach eventlistener to
       // todo: have the spawn function dispatch a custom event to be listened for here
@@ -686,9 +719,9 @@ class Game {
    function is_it_over_yet() {
       if(creeps.length>=Settings.death) {
          // yes it's over
-         //new Menu();
+         stats.last_score= creeps.killed*(10+creeps.wave_counter);
          stop();
-         menu.start();
+         gameover.start();
       }
    }
    public function stop() {
@@ -707,6 +740,37 @@ class Game {
       b1.show();
       b2.show();
       towers.start();
+   }
+}
+
+class GameOver {
+   var menu:Menu;
+   var done:Button;
+   var stats:Stats;
+   var score:Txt;
+
+   public function new(m:Menu) {
+      menu= m;
+      stats= menu.stats;
+
+      score= new Txt(10,10,"Your score: "+Std.string(stats.last_score));
+         
+      done= new Button(10,150,"Back to Menu");
+      done.addEventListener(MouseEvent.MOUSE_DOWN,click_back);
+      stop();
+   }
+   function click_back(e:MouseEvent) {
+      stop();
+      menu.start();
+   }
+   function stop() {
+      score.hide();
+      done.hide();
+   }
+   public function start() {
+      score.update("Your score: "+Std.string(stats.last_score));
+      score.show();
+      done.show();
    }
 }
 
@@ -745,6 +809,7 @@ class Menu {
    var credits:Button;
    var game:Game;
    var cred:Credits;
+   public var stats:Stats; // public so all the submenus can access the stats through menu
 
    public function new() {
       startb= new Button(120,40,"Start Game!");
@@ -752,7 +817,8 @@ class Menu {
       
       credits= new Button(120,70,"Credits");
       credits.addEventListener(MouseEvent.MOUSE_DOWN,click_credits);
-
+            
+      stats= new Stats();
       game= new Game(this);
       cred= new Credits(this);
    }

@@ -1,5 +1,9 @@
-import flash.display.Shape;
+import flash.display.Sprite;
+import flash.events.MouseEvent;
+import flash.events.Event;
+
 import Settings;
+import Interface;
 
 class RoutePoint {
    public var x:Float;
@@ -38,15 +42,16 @@ class Route {
    }
 }
 
-class Creep extends Shape {
-   var hp:Int;
+class Creep extends Sprite {
+   public var hp:Int;
    var maxhp:Int;
-   var speed:Int;
+   public var speed:Int;
    var goal:RoutePoint;
    var route:Route;
    var frames:Int;
    public var dead:Bool;
    public var value:Int;
+   var info:CreepInfo;
 
    public function new(r:Route,mhp=50,val=1,s=1) {
       super();
@@ -69,6 +74,8 @@ class Creep extends Shape {
       draw_healthbar();   
 
       this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+      this.addEventListener(MouseEvent.MOUSE_OVER,mouse_over);
+      this.addEventListener(MouseEvent.MOUSE_OUT,mouse_out);
       
       flash.Lib.current.addChild(this);
    }
@@ -106,6 +113,12 @@ class Creep extends Shape {
          frames= 0;
       }
    }
+   function mouse_over(e:MouseEvent) {
+      info= new CreepInfo(this);
+   }
+   function mouse_out(e:MouseEvent) {
+      info.delete();
+   }
    function move_to_goal() {
       var csf= Settings.creep_speedfactor;
       if(x>goal.x) x-=csf;
@@ -126,4 +139,33 @@ class Creep extends Shape {
       else { return false; } 
    }
 }
+
+class CreepInfo {
+   var infobox:Txt;
+   var creep:Creep;
+
+   public function new(c:Creep) {
+      creep= c;
+      var ts= Settings.tilesize;
+      var x= ts*6.5;
+      var y_base= ts*9;
+      var s= Settings.fontsize_small;
+      infobox= new Txt(x,y_base,"Super Evil Thing!",s);
+      infobox.addline("Health: "+Std.string(creep.hp));
+      infobox.addline("Speed: "+Std.string(creep.speed));
+      infobox.addline("Gold: "+Std.string(creep.value));
+      
+      creep.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+   }
+
+   function enter_frame(e:Event) {
+      infobox.update("Health: "+Std.string(creep.hp),1);
+   }
+
+   public function delete() {
+      creep.removeEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
+      infobox.delete();
+   }
+}
+
 
