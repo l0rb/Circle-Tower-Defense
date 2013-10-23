@@ -40,6 +40,11 @@ class Stats {
          total_score= storage.data.total_score;
       }
    }
+   public function add_score(s:Int=0) {
+      last_score= s;
+      total_score+= s;
+      save();
+   }
 }
 
 class Gold {
@@ -146,7 +151,8 @@ class Bullet extends Shape {
       haxe.Timer.delay(endExplosion,110);
    }
 
-   function endExplosion() {
+   public function endExplosion() {
+      source.bullets.remove(this);
       flash.Lib.current.removeChild(this);
    }
 
@@ -162,6 +168,7 @@ class Field extends Sprite {
    var creeps:Creeps;
    var info:FieldInfo;
    var range_cone:Shape;
+   public var bullets:List<Bullet>;
    public var level:Int;
    public var tower:TowerType;
    public var gold:Gold;
@@ -179,7 +186,8 @@ class Field extends Sprite {
       graphics.beginFill(0xffffff);
       graphics.drawCircle(0,0,3);
       graphics.endFill();
-      
+      bullets= new List<Bullet>();      
+
       this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       this.addEventListener(MouseEvent.MOUSE_OVER,mouse_over);
       this.addEventListener(MouseEvent.MOUSE_OUT,mouse_out);
@@ -189,9 +197,16 @@ class Field extends Sprite {
    }
      
    public function delete() {
-      flash.Lib.current.removeChild(this);
+      hide();
    }
    public function hide() {
+      if(!bullets.isEmpty()) {
+         for(b in bullets.iterator()) {
+            if(flash.Lib.current.contains(b)) {
+               flash.Lib.current.removeChild(b);
+            }
+         }
+      }
       flash.Lib.current.removeChild(this);
    }
    public function show() {
@@ -254,7 +269,7 @@ class Field extends Sprite {
       // search for a creep in range
       var target= creeps.closest(x,y);
       if(target.distance<=tower.range(level)) {
-         new Bullet(this, target.creep);
+         bullets.add(new Bullet(this, target.creep));
       }
    }
 
@@ -359,7 +374,7 @@ class TowerButton extends Sprite {
       gold= g;
       
       graphics.lineStyle(3,0xff0000);
-      graphics.beginFill(0x00ffff);
+      graphics.beginFill(type.color);
       graphics.drawCircle(0,0,10);
       graphics.endFill();
       
@@ -550,8 +565,9 @@ class Creeps extends List<Creep> {
       update();
    }
    public function spawn_wave_with_route(r:Route) {
-      var wavesize= 10;    // number of creeps
-      var waveival= 1500;  // time between creeps in ms
+      wave_counter+= 1;
+      var wavesize= Settings.wavesize;    // number of creeps
+      var waveival= Settings.spawntime;  // time between creeps in ms
       var tmp=wavesize*waveival;
       var i=0;
       while(i<tmp) {
@@ -565,7 +581,6 @@ class Creeps extends List<Creep> {
    }
    
    public function spawn_wave() {
-      wave_counter+= 1;
       spawn_wave_with_route(route);
    }
 }
@@ -735,20 +750,19 @@ class Game {
    function is_it_over_yet() {
       if(creeps.length>=Settings.death) {
          // yes it's over
-         stats.last_score= gold.get()+creeps.killed*(10+creeps.wave_counter);
-         stats.total_score+= stats.last_score;
-         stats.save();
+         var score= gold.get()+creeps.killed*(10+creeps.wave_counter);
+         stats.add_score(score);
          stop();
          gameover.start();
       }
    }
    public function stop() {
+      towers.stop();
       creeps.stop();
       clock.stop();
       b1.hide();
       b2.hide();
       gold.stop();
-      towers.stop();
    }
    public function start() {
       creeps.start();

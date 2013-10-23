@@ -13,10 +13,12 @@ class Settings {
    static inline public var tilesize= 24;
    static inline public var creep_speedfactor= 2; // (tilesize/creep_speedfactor)%2==0 advisabe
    static inline public var bullet_speedfactor= 4;
-   static inline public var wavetime= 12;
+   static inline public var wavesize= 10; // number of creeps per wave
+   static inline public var wavetime= 12; // time in seconds between waves
+   static inline public var spawntime= 666; // time in milliseconds between creeps
    static inline public var death= 10; // game over if this many creeps on screen
    
-   static inline public var start_gold= 40; // game over if this many creeps on screen
+   static inline public var start_gold= 40;
 }
 class Colors {
    static inline public var black= 0x000000;

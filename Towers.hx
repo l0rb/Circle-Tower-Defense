@@ -1,3 +1,5 @@
+import Math;
+
 class TowerType {
    public var id:Int;
    public var base_range:Int;
@@ -24,7 +26,7 @@ class TowerType {
       return base_rate;
    }
    public function cost(l=0) {
-      return base_cost*(l+1);
+      return Std.int( base_cost * Math.pow(2,l) );
    }
 }
 
@@ -36,6 +38,6 @@ class BasicTower extends TowerType {
 
 class LongRangeTower extends TowerType {
    public function new() {
-      super(2,80,10,22,10,0x00a0a0);
+      super(2,80,10,20,10,0x00a0a0);
    }
 }
