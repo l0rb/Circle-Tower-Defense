@@ -2,7 +2,7 @@ import flash.display.MovieClip;
 import flash.display.Shape;
 import flash.display.Graphics;
 import flash.display.Sprite;
-
+import flash.net.SharedObject;
 import flash.events.MouseEvent;
 import flash.events.Event;
 
@@ -17,12 +17,28 @@ import Settings;
 
 class Stats {
    public var last_score:Int;
-   var total_score:Int;
+   public var total_score:Int;
          
    public function new() {
       // todo: read data from SharedObject
       last_score= 0;
       total_score= 0;
+      load();
+   }
+   public function save() {
+      var storage:SharedObject = SharedObject.getLocal("ctd_storage");
+      storage.data.total_score= total_score;
+      try {
+         storage.flush(); // fails if user does not allow to save stuff local
+      } catch(err:Dynamic) {
+         trace("Error: can't save.");
+      }
+   }
+   public function load() {
+      var storage:SharedObject = SharedObject.getLocal("ctd_storage");
+      if(storage.data.total_score) {
+         total_score= storage.data.total_score;
+      }
    }
 }
 
@@ -719,7 +735,9 @@ class Game {
    function is_it_over_yet() {
       if(creeps.length>=Settings.death) {
          // yes it's over
-         stats.last_score= creeps.killed*(10+creeps.wave_counter);
+         stats.last_score= gold.get()+creeps.killed*(10+creeps.wave_counter);
+         stats.total_score+= stats.last_score;
+         stats.save();
          stop();
          gameover.start();
       }
@@ -754,7 +772,8 @@ class GameOver {
       stats= menu.stats;
 
       score= new Txt(10,10,"Your score: "+Std.string(stats.last_score));
-         
+      score.addline("All time Total: "+Std.string(stats.total_score));
+ 
       done= new Button(10,150,"Back to Menu");
       done.addEventListener(MouseEvent.MOUSE_DOWN,click_back);
       stop();
@@ -769,6 +788,7 @@ class GameOver {
    }
    public function start() {
       score.update("Your score: "+Std.string(stats.last_score));
+      score.update("All time Total: "+Std.string(stats.total_score),1);
       score.show();
       done.show();
    }

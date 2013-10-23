@@ -14,7 +14,7 @@ class Settings {
    static inline public var creep_speedfactor= 2; // (tilesize/creep_speedfactor)%2==0 advisabe
    static inline public var bullet_speedfactor= 4;
    static inline public var wavetime= 12;
-   static inline public var death= 20; // game over if this many creeps on screen
+   static inline public var death= 10; // game over if this many creeps on screen
    
    static inline public var start_gold= 40; // game over if this many creeps on screen
 }
