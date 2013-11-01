@@ -16,7 +16,7 @@ class Txt {
    var format:flash.text.TextFormat;
    var x:Float;
    var y:Float;
-   var line_height:Float;
+   public var line_height:Float;
 
    public function new(x:Float=0,y:Float=0,text:String="",size:Int=Settings.fontsize_std,color=Colors.black) {
       this.x= x;
@@ -85,14 +85,13 @@ class Button extends flash.text.TextField {
       format.font= Settings.font;
       defaultTextFormat= format;
              
-      //height= textHeight;
-      //width= textWidth;
       autoSize= TextFieldAutoSize.CENTER;
          
       flash.Lib.current.addChild(this);
          
       this.addEventListener(MouseEvent.MOUSE_OVER,mouse_over);
       this.addEventListener(MouseEvent.MOUSE_OUT,mouse_out);
+      this.addEventListener(MouseEvent.MOUSE_DOWN,onclick);
    }
       
    function mouse_over(e:MouseEvent) {
@@ -101,7 +100,7 @@ class Button extends flash.text.TextField {
    function mouse_out(e:MouseEvent) {
       backgroundColor= Colors.button;
    }
-   function onclick(e:MouseEvent);
+   function onclick(e:MouseEvent) {} // to override in derived classes
 
    public function hide() {
       flash.Lib.current.removeChild(this);

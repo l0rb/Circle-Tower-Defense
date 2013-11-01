@@ -18,16 +18,19 @@ import Settings;
 class Stats {
    public var last_score:Int;
    public var total_score:Int;
+   public var score_invested:Int; // score used to buy upgrades
          
    public function new() {
       // todo: read data from SharedObject
       last_score= 0;
       total_score= 0;
+      score_invested= 0;
       load();
    }
    public function save() {
       var storage:SharedObject = SharedObject.getLocal("ctd_storage");
       storage.data.total_score= total_score;
+      storage.data.total_score= score_invested;
       try {
          storage.flush(); // fails if user does not allow to save stuff local
       } catch(err:Dynamic) {
@@ -38,12 +41,131 @@ class Stats {
       var storage:SharedObject = SharedObject.getLocal("ctd_storage");
       if(storage.data.total_score) {
          total_score= storage.data.total_score;
+         score_invested= storage.data.score_invested;
       }
    }
    public function add_score(s:Int=0) {
       last_score= s;
       total_score+= s;
       save();
+   }
+   public function invest(s:Int=0) {
+      if(score_invested+s <= total_score) {
+         score_invested+= s;
+         save();
+         return true;
+      } else {
+         return false;
+      }
+   }
+}
+
+class Upgrade {
+   var affects:Array<Int>; // ids of all towers that benefit from this upgrade
+   var base_cost:Int;
+   var cost_increase_factor:Float;
+   public var level:Int;
+   public var name:String;
+   public var desc:String;
+
+   public function new(a:Array<Int>,n:String,d:String,c=100,cif=2.0) {
+      level= 0;
+      affects= a;
+      name= n;
+      desc= d;
+      base_cost= c;
+      cost_increase_factor= cif;
+   }
+
+   public function cost() {
+      return Std.int( base_cost*Math.pow(cost_increase_factor,level) );
+   }
+   public function applies (t:TowerType) {
+      return Lambda.has(affects, t.id);
+   }
+   public function apply (t:TowerType) {} // override with what upgrade actually is good for
+}
+
+class RangeUpgrade extends Upgrade {
+   public function new() {
+      super([1,2],"Range","Improve range of all towers.",120,1.66667);
+   }
+   override public function apply(t:TowerType) {
+      t.base_range+= level; // increases range by 1 per level
+   }
+}
+
+class DmgUpgrade1 extends Upgrade {
+   public function new() {
+      super([1],"Base Attack","Improve damage of basic tower.",100,1.5);
+   }
+   override public function apply(t:TowerType) {
+      t.base_dmg+= level*2; // increases base_damage by 2 per level
+   }
+}
+
+class UpgradeButton extends Button {
+   public var upgrade:Upgrade;
+   var nme:Txt;
+   var desc:Txt;
+
+   public function new(x:Int,y:Int,u:Upgrade) {
+      super(x,y,"Level up!");
+      this.x+= 200; // move button to right of text
+      upgrade= u;
+      nme= new Txt(x,y,upgrade.name+" Level "+Std.string(upgrade.level+1));
+      desc= new Txt(x,y+nme.line_height,upgrade.desc+" Cost: "+Std.string(u.cost()),Settings.fontsize_small);
+   }
+   override public function hide() {
+      flash.Lib.current.removeChild(this);
+      desc.hide();
+      nme.hide();
+   }
+   override public function show() {
+      flash.Lib.current.addChild(this);
+      desc.show();
+      nme.show();
+   }
+   override function onclick(e:MouseEvent) {
+      upgrade.level+=1;
+      nme.update(upgrade.name+" Level "+Std.string(upgrade.level+1));
+      desc.update(upgrade.desc+" Cost: "+Std.string(upgrade.cost()));
+   }
+}
+
+class Upgrades extends List<UpgradeButton> {
+   var points:Int;
+   var menu:Menu;
+   var back:Button;
+
+   public function new(m:Menu) {
+      super();
+      menu=m;
+      points=menu.stats.total_score;
+
+      add(new UpgradeButton(10,10,new RangeUpgrade()));
+      add(new UpgradeButton(10,40,new DmgUpgrade1()));
+
+      back= new Button(10,150,"Back to Menu");
+      back.addEventListener(MouseEvent.MOUSE_DOWN,click_back);
+      hide();
+   }
+
+   function click_back(e:MouseEvent) {
+      hide();
+      menu.start();
+   }
+   public function hide() {
+      back.hide();
+      for(i  in iterator()) {
+         i.hide();
+      }
+   }
+   public function show() {
+      back.show();
+      for(i in iterator()) {
+         i.show();
+      }
    }
 }
 
@@ -394,7 +516,9 @@ class TowerButton extends Sprite {
    public function delete() {
       hide();
    }
-
+   public function set_type(t:TowerType) {
+      tower_type= t;
+   }
    function mouse_over(e:MouseEvent) {
       info= new TowerInfo(tower_type);
    }
@@ -690,16 +814,18 @@ class Clock {
 }
 
 class Game {
-   static var creeps:Creeps;
-   static var route:Route;
-   static var clock:Clock;
-   static var gold:Gold;
-   static var towers:TowerGrid;
-   static var b1:TowerButton;
-   static var b2:TowerButton;
-   static var menu:Menu;
-   static var gameover:GameOver;
-   static var stats:Stats;
+   var creeps:Creeps;
+   var route:Route;
+   var clock:Clock;
+   var gold:Gold;
+   var towers:TowerGrid;
+   var b1:TowerButton;
+   var b2:TowerButton;
+   var menu:Menu;
+   var gameover:GameOver;
+   var stats:Stats;
+   var tower_types:Array<TowerType>;
+   var upgrades:Upgrades;
 
    // textfields
    static var time:Txt;
@@ -707,8 +833,9 @@ class Game {
    static var creeps_t:Txt;
    static var wave_t:Txt;
 
-   public function new(m:Menu) {
+   public function new(m:Menu,u:Upgrades) {
       menu= m;
+      upgrades= u;
       stats= menu.stats;
 
       var ts= Settings.tilesize;
@@ -732,9 +859,11 @@ class Game {
       time= new Txt();
       clock= new Clock(1000,time,creeps);
       
+      tower_types= new Array<TowerType>();
+      create_tower_types();
       towers= new TowerGrid(creeps);
-      b1= new TowerButton(towers, new BasicTower(),gold);
-      b2= new TowerButton(towers, new LongRangeTower(),gold,1);
+      b1= new TowerButton(towers, tower_types[0],gold);
+      b2= new TowerButton(towers, tower_types[1],gold,1);
   
       gameover= new GameOver(m);
 
@@ -743,6 +872,18 @@ class Game {
       // todo: have the spawn function dispatch a custom event to be listened for here
       flash.Lib.current.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       stop();
+   }
+   function create_tower_types() {
+      if(tower_types.length!=0) { tower_types= []; }
+      tower_types.push(new BasicTower());
+      tower_types.push(new LongRangeTower());
+      for(t in tower_types.iterator()) {
+         for(u in upgrades.iterator()) {
+            if(u.upgrade.applies(t)) {
+               u.upgrade.apply(t);
+            }
+         }
+      }
    }
    function enter_frame(e:Event) {
       is_it_over_yet();
@@ -772,6 +913,11 @@ class Game {
       b1.show();
       b2.show();
       towers.start();
+      
+      // so upgrades are applied
+      create_tower_types();
+      b1.set_type(tower_types[0]);
+      b2.set_type(tower_types[1]);
    }
 }
 
@@ -839,22 +985,28 @@ class Credits {
 }
 
 class Menu {
-   var startb:Button;
-   var credits:Button;
    var game:Game;
    var cred:Credits;
+   var up:Upgrades;
+   var gameb:Button;
+   var credb:Button;
+   var upb:Button;
    public var stats:Stats; // public so all the submenus can access the stats through menu
 
    public function new() {
-      startb= new Button(120,40,"Start Game!");
-      startb.addEventListener(MouseEvent.MOUSE_DOWN,click_start);
+      gameb= new Button(120,40,"Start Game!");
+      gameb.addEventListener(MouseEvent.MOUSE_DOWN,click_start);
       
-      credits= new Button(120,70,"Credits");
-      credits.addEventListener(MouseEvent.MOUSE_DOWN,click_credits);
+      upb= new Button(120,70,"Upgrades");
+      upb.addEventListener(MouseEvent.MOUSE_DOWN,click_upgrades);
             
+      credb= new Button(120,100,"Credits");
+      credb.addEventListener(MouseEvent.MOUSE_DOWN,click_credits);
+          
       stats= new Stats();
-      game= new Game(this);
       cred= new Credits(this);
+      up= new Upgrades(this);
+      game= new Game(this,up);
    }
 
    function click_start(e:MouseEvent) {
@@ -865,14 +1017,20 @@ class Menu {
       stop();
       cred.show();
    }
+   function click_upgrades(e:MouseEvent) {
+      stop();
+      up.show();
+   }
 
    public function stop() {
-      startb.hide();
-      credits.hide();
+      gameb.hide();
+      credb.hide();
+      upb.hide();
    }
    public function start() {
-      startb.show();
-      credits.show();
+      gameb.show();
+      credb.show();
+      upb.show();
    }
 }
 

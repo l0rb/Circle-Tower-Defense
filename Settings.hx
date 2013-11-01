@@ -2,11 +2,11 @@
 
 class Settings {
 
-   static inline private var size= 1;
+   static inline private var size= 2;
 
-   static inline public var fontsize_small= 8*size;
-   static inline public var fontsize_std= 12*size;
-   static inline public var fontsize_big= 22*size;
+   static inline public var fontsize_small= 4*size;
+   static inline public var fontsize_std= 6*size;
+   static inline public var fontsize_big= 11*size;
 
    static inline public var font= "DejaVu Sans Mono";
 
