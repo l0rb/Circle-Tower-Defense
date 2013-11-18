@@ -5,6 +5,7 @@ import flash.display.Sprite;
 import flash.net.SharedObject;
 import flash.events.MouseEvent;
 import flash.events.Event;
+import flash.events.KeyboardEvent;
 
 import Math;
 import haxe.Timer;
@@ -799,7 +800,13 @@ class Clock {
       }
       text.update("Next Wave: "+Std.string(n));
    }
-      
+
+   public function spawn_now() {
+      n= Settings.wavetime;
+      creeps.spawn_wave();
+      text.update("Next Wave: "+Std.string(n));
+   }
+
    public function stop() {
       text.hide();
       timer.stop();
@@ -826,6 +833,7 @@ class Game {
    var stats:Stats;
    var tower_types:Array<TowerType>;
    var upgrades:Upgrades;
+   var send_next:Button;
 
    // textfields
    static var time:Txt;
@@ -858,13 +866,16 @@ class Game {
            
       time= new Txt();
       clock= new Clock(1000,time,creeps);
-      
+       
       tower_types= new Array<TowerType>();
       create_tower_types();
       towers= new TowerGrid(creeps);
       b1= new TowerButton(towers, tower_types[0],gold);
       b2= new TowerButton(towers, tower_types[1],gold,1);
-  
+      
+      send_next= new Button(ts*10,ts*0,"Send now! (Key: Space)");
+      send_next.addEventListener(MouseEvent.MOUSE_DOWN,send_next_now);
+
       gameover= new GameOver(m);
 
       // can't add eventlistener to Game-Object
@@ -872,6 +883,12 @@ class Game {
       // todo: have the spawn function dispatch a custom event to be listened for here
       flash.Lib.current.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
       stop();
+   }
+   function send_next_now(e:Event) {
+      clock.spawn_now();
+   }
+   function key_up_handler(e:KeyboardEvent) {
+      if(e.keyCode==flash.ui.Keyboard.SPACE) { clock.spawn_now(); }
    }
    function create_tower_types() {
       if(tower_types.length!=0) { tower_types= []; }
@@ -904,6 +921,8 @@ class Game {
       b1.hide();
       b2.hide();
       gold.stop();
+      send_next.hide();
+      flash.Lib.current.stage.removeEventListener(KeyboardEvent.KEY_UP,key_up_handler);
    }
    public function start() {
       creeps.start();
@@ -913,11 +932,16 @@ class Game {
       b1.show();
       b2.show();
       towers.start();
-      
+      send_next.show();
+
       // so upgrades are applied
       create_tower_types();
       b1.set_type(tower_types[0]);
       b2.set_type(tower_types[1]);
+
+      // for hotkeys to work
+      flash.Lib.current.stage.focus= flash.Lib.current.stage;
+      flash.Lib.current.stage.addEventListener(KeyboardEvent.KEY_UP,key_up_handler);
    }
 }
 
