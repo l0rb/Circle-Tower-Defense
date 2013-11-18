@@ -527,11 +527,11 @@ class TowerButton extends Sprite {
       info.delete();
    }
  
-   function onclick(e:MouseEvent) {
+   function start_build(x:Float,y:Float) {
       clickSprite= new Sprite();
       var s= clickSprite;
-      s.x= e.stageX;
-      s.y= e.stageY;
+      s.x= x;
+      s.y= y;
       s.graphics.beginFill(0x000000,0.2);
       s.graphics.drawCircle(0,0,tower_type.range());
       s.graphics.beginFill(Colors.invalid);
@@ -544,6 +544,12 @@ class TowerButton extends Sprite {
       s.addEventListener(MouseEvent.MOUSE_MOVE,mouse_move);
       s.addEventListener(MouseEvent.MOUSE_OUT,mouse_move);
       flash.Lib.current.addChild(s);
+   }
+   public function hotkey_build() {
+      start_build(flash.Lib.current.mouseX,flash.Lib.current.mouseY);
+   }
+   function onclick(e:MouseEvent) {
+      start_build(e.stageX,e.stageY);
    }
    function build(e:MouseEvent) {
       var s= clickSprite;
@@ -725,6 +731,7 @@ class TowerInfo {
       infobox.addline("Rate: "+Std.string(type.rate()));
       infobox.addline("Range: "+Std.string(type.range()));
       infobox.addline("This tower shoots.");
+      infobox.addline("Hotkey: "+type.hotkey);
    }
 
    public function delete() {
@@ -889,6 +896,8 @@ class Game {
    }
    function key_up_handler(e:KeyboardEvent) {
       if(e.keyCode==flash.ui.Keyboard.SPACE) { clock.spawn_now(); }
+      if(e.keyCode==49) { b1.hotkey_build(); } // 49 is keycode for '1'
+      if(e.keyCode==50) { b2.hotkey_build(); } // 50 is keycode for '2'
    }
    function create_tower_types() {
       if(tower_types.length!=0) { tower_types= []; }

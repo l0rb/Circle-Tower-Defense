@@ -8,8 +8,9 @@ class TowerType {
    public var color:Int;
    public var base_rate:Int; // time between shots in frames
    public var name:String;
+   public var hotkey:String;
 
-   public function new(id=1,range=50,dmg=15,rate=20,cost=5,col=0x0000aa,n="[Tower]") {
+   public function new(id=1,range=50,dmg=15,rate=20,cost=5,col=0x0000aa,n="[Tower]",hkey="none") {
       this.id= id;
       base_range= range;
       base_dmg= dmg;
@@ -17,6 +18,7 @@ class TowerType {
       base_cost= cost;
       color= col;
       name= n;
+      hotkey= hkey;
    }
    public function dmg(l=0) {
       return base_dmg*(l+1);
@@ -34,12 +36,12 @@ class TowerType {
 
 class BasicTower extends TowerType {
    public function new() {
-      super(1,50,15,20,5,0x0000a0,"Basic Tower");
+      super(1,50,15,20,5,0x0000a0,"Basic Tower","1");
    }
 }
 
 class LongRangeTower extends TowerType {
    public function new() {
-      super(2,80,10,20,10,0x00a0a0,"Long Range");
+      super(2,80,10,20,10,0x00a0a0,"Long Range","2");
    }
 }
