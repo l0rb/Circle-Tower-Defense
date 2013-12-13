@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+   <movie version="9" as3="1" width="22" height="22">
+      <frame>
+         <library>
+            <clip id="Gobo" import="goblin0_22x22.png"/>
+         </library>
+      </frame>
+   </movie>

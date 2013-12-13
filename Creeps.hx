@@ -1,9 +1,16 @@
-import flash.display.Sprite;
 import flash.events.MouseEvent;
 import flash.events.Event;
+import flash.display.MovieClip;
+import flash.display.Sprite;
 
 import Settings;
 import Interface;
+
+class Gobo extends MovieClip {
+   public function new() {
+      super();
+   }
+}
 
 class RoutePoint {
    public var x:Float;
@@ -52,6 +59,8 @@ class Creep extends Sprite {
    public var dead:Bool;
    public var value:Int;
    var info:CreepInfo;
+   var mc:MovieClip;
+   var healthbar:Sprite;
 
    public function new(r:Route,mhp=50,val=1,s=1) {
       super();
@@ -65,12 +74,19 @@ class Creep extends Sprite {
       y= 0; // top of screen
       x= 5.5*Settings.tilesize;
       goal= new RoutePoint(x,2.5*Settings.tilesize);
+      mc= new Gobo();
+      healthbar= new Sprite();
+      
+      this.addChild(mc);
+      this.addChild(healthbar);
 
-      graphics.lineStyle(3,0xff0000);
-      graphics.beginFill(0x0000ff);
-      graphics.drawCircle(0,0,10);
-      graphics.endFill();
-   
+      //graphics.lineStyle(3,0xff0000);
+      //graphics.beginFill(0x0000ff);
+      //graphics.drawCircle(0,0,10);
+      //graphics.endFill();
+      mc.x= -Settings.tilesize/2 + 1;
+      mc.y= -Settings.tilesize/2 + 1;
+
       draw_healthbar();   
 
       this.addEventListener(flash.events.Event.ENTER_FRAME,enter_frame);
@@ -88,13 +104,13 @@ class Creep extends Sprite {
       var ts= Settings.tilesize;
       var percent= hp/maxhp;
 
-      graphics.lineStyle(1,0x000000);
-      graphics.beginFill(0xffffff);
-      graphics.drawRect(-ts/3,-ts/12,2*ts/3,ts/6);
-      graphics.lineStyle();
-      graphics.beginFill(0x00ff00);
-      graphics.drawRect(-ts/3,-ts/12+1,(2*ts/3)*percent,ts/6-2);
-      graphics.endFill();
+      healthbar.graphics.lineStyle(1,0x000000);
+      healthbar.graphics.beginFill(0xffffff);
+      healthbar.graphics.drawRect(-ts/3,-ts/12,2*ts/3,ts/6);
+      healthbar.graphics.lineStyle();
+      healthbar.graphics.beginFill(0x00ff00);
+      healthbar.graphics.drawRect(-ts/3,-ts/12+1,(2*ts/3)*percent,ts/6-2);
+      healthbar.graphics.endFill();
    }
 
    public function fire(dmg:Int) {

@@ -1,3 +1,4 @@
+-swf-lib resource.swf
 -swf test.swf
 -main Test
 -swf-header 600:400:30:FFFFFF
