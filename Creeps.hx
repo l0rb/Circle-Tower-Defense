@@ -56,6 +56,7 @@ class Creep extends Sprite {
    var goal:RoutePoint;
    var route:Route;
    var frames:Int;
+   var animation_frames:Int;
    public var dead:Bool;
    public var value:Int;
    var info:CreepInfo;
@@ -69,6 +70,7 @@ class Creep extends Sprite {
       speed= s;
       value= val;
       frames= 0;
+      animation_frames= 0;
       route= r;
       dead= false;
       y= 0; // top of screen
@@ -76,8 +78,11 @@ class Creep extends Sprite {
       goal= new RoutePoint(x,2.5*Settings.tilesize);
       mc= new Gobo();
       healthbar= new Sprite();
+
+      mouseChildren= false; // the mouse_out event can't work without this
       
       this.addChild(mc);
+      mc.stop();
       this.addChild(healthbar);
 
       //graphics.lineStyle(3,0xff0000);
@@ -127,6 +132,12 @@ class Creep extends Sprite {
       if(frames==speed) {
          move_to_goal();
          frames= 0;
+         animation_frames+= 1;
+         if(animation_frames==13*speed) {
+            // steps to next frame on the timeline and loops back round to frame 1 when it hits the end
+            mc.gotoAndStop(mc.currentFrame==mc.totalFrames ? 1 : mc.currentFrame+1);
+            animation_frames= 0;
+         }
       }
    }
    function mouse_over(e:MouseEvent) {
